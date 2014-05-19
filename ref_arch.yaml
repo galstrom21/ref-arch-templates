@@ -5,6 +5,24 @@ description: >
   it will setup all of the required lbaas vips.
 
 parameters:
+  keystone_admin_api_port:
+    description: The port keystone-admin-api is listening on.
+    type: number
+    default: 35357
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  keystone_api_port:
+    description: The port keystone-api is listening on.
+    type: number
+    default: 5000
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
   nova_api_port:
     description: The port nova-api is listening on.
     type: number
@@ -45,6 +63,42 @@ parameters:
     description: The port cinder-api is listening on.
     type: number
     default: 8776
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  ceilometer_api_port:
+    description: The port ceilometer-api is listening on.
+    type: number
+    default: 8777
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  heat_api_port:
+    description: The port heat-api is listening on.
+    type: number
+    default: 8004
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  heat_cfn_api_port:
+    description: The port heat-cfn-api is listening on.
+    type: number
+    default: 8000
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  heat_cloudwatch_api_port:
+    description: The port heat-cloudwatch-api is listening on.
+    type: number
+    default: 8003
     constraints:
     - range:
         min: 1025
@@ -191,9 +245,9 @@ resources:
       name: "lb-keystone_admin_api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: 35357
+        port: { get_param: keystone_admin_api_port }
         condition: ENABLED
-      port: 35357
+      port: { get_param: keystone_admin_api_port }
       protocol: HTTP
       algorithm: { get_param: lb_algorithm }
       virtualIps:
@@ -213,9 +267,9 @@ resources:
       name: "lb-keystone_api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: 5000
+        port: { get_param: keystone_api_port }
         condition: ENABLED
-      port: 5000
+      port: { get_param: keystone_api_port }
       protocol: HTTP
       algorithm: { get_param: lb_algorithm }
       virtualIps:
@@ -345,9 +399,9 @@ resources:
       name: "lb-ceilometer-api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: 8777
+        port: { get_param: ceilometer_api_port }
         condition: ENABLED
-      port: 8777
+      port: { get_param: ceilometer_api_port }
       protocol: HTTP
       algorithm: LEAST_CONNECTIONS
       virtualIps:
@@ -367,9 +421,9 @@ resources:
       name: "lb-heat-api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: 8004
+        port: { get_param: heat_api_port }
         condition: ENABLED
-      port: 8004
+      port: { get_param: heat_api_port }
       protocol: HTTP
       algorithm: { get_param: lb_algorithm }
       virtualIps:
@@ -389,9 +443,9 @@ resources:
       name: "lb-heat-cfn-api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: 8000
+        port: { get_param: heat_api_cfn_port }
         condition: ENABLED
-      port: 8000
+      port: { get_param: heat_api_cfn_port }
       protocol: HTTP
       algorithm: { get_param: lb_algorithm }
       virtualIps:
@@ -411,9 +465,9 @@ resources:
       name: "lb-heat-cloudwatch-api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: 8003
+        port: { get_param: heat_api_cloudwatch_port }
         condition: ENABLED
-      port: 8003
+      port: { get_param: heat_api_cloudwatch_port }
       protocol: HTTP
       algorithm: { get_param: lb_algorithm }
       virtualIps:
