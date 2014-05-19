@@ -1,0 +1,477 @@
+heat_template_version: 2013-05-23
+
+description: >
+  This template will provision the minimum number of required nodes, as well
+  it will setup all of the required lbaas vips.
+
+parameters:
+  nova_api_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 8774
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  nova_api_ec2_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 8773
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  glance_api_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 9292
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  glance_registry_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 9191
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  cinder_api_port:
+    description: The port cinder-api is listening on.
+    type: number
+    default: 8776
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  lb_algorithm:
+    description: The algorithm used for the loadbalancer.
+    type: string
+    default: LEAST_CONNECTIONS
+    constraints:
+    - allowed_values:
+      - LEAST_CONNECTIONS
+      - ROUND_ROBIN
+      description: |
+        Must be a valid Rackspace Cloud Loadbalancer algorithm.
+
+resources:
+  chef_server:
+    type: "Rackspace::Cloud::Server"
+    properties:
+      flavor: 2 GB Performance
+      image: Ubuntu 12.04 LTS (Precise Pangolin)
+      key_name: shep
+      user_data: |
+        #!/bin/bash
+        apt-get install -y curl screen git libxml2-dev libxslt-dev build-essential ruby1.9.3
+
+        # Install chef-server
+        curl -skS -L https://raw.githubusercontent.com/rcbops/support-tools/master/chef-install/install-chef-server.sh | bash
+
+        # THIS IS DIRTY
+        # Start a webserver in /root/.chef
+        pushd /root/.chef
+        screen -t 'webserver' -d -m python -m SimpleHTTPServer 9999
+        popd
+
+        # Grab a copy of the cookbooks
+        pushd /opt
+        git clone https://github.com/stackforge/openstack-chef-repo
+        pushd openstack-chef-repo
+        gem1.9.3 install bundler
+        bundle install --path=.bundle
+        mkdir /root/.berkshelf
+        cat << 'EOF' |sudo tee /root/.berkshelf/config.json
+        { "ssl": { "verify": false } }
+        EOF
+        bundle exec berks upload
+        knife role from file roles/*.json
+        popd
+        popd
+  infra_nodes:
+    type: "OS::Heat::ResourceGroup"
+    properties:
+      count: 3
+      resource_def:
+        type: "Rackspace::Cloud::Server"
+        properties:
+          flavor: 2 GB Performance
+          image: Ubuntu 12.04 LTS (Precise Pangolin)
+          key_name: shep
+          user_data:
+              str_replace:
+                template: |
+                  #!/bin/bash
+                  apt-get install -y curl
+
+                  # Install chef-client
+                  curl -skS -L http://www.opscode.com/chef/install.sh | bash
+
+                  mkdir -p /etc/chef
+
+                  # Build chef-client config
+                  cat << 'EOF' |sudo tee /etc/chef/client.rb
+                  Ohai::Config[:disabled_plugins] = ["passwd"]
+
+                  chef_server_url "https://%chef_server_ip%:443"
+                  chef_environment "%chef_environment%"
+                  EOF
+
+                  # Grab the chef-validator.pem
+                  sudo curl http://%chef_server_ip%:9999/chef-validator.pem > %chef_pem%
+
+                  # Do initial chef-client run
+                  sudo chef-client
+
+                  # Drop a knife config file
+                  cat << 'EOH' |sudo tee /etc/chef/knife.rb
+                  chef_server_url "https://%chef_server_ip%:443"
+                  chef_environment "%chef_environment%"
+                  EOH
+                  echo "$(hostname)" >> /etc/chef/knife.rb
+                params:
+                  "%chef_server_ip%": { get_attr: [ chef_server, privateIPv4 ] }
+                  "%chef_environment%": "ref-arch"
+                  "%chef_pem%": "/etc/chef/validation.pem"
+  network_nodes:
+    type: "OS::Heat::ResourceGroup"
+    properties:
+      count: 2
+      resource_def:
+        type: "Rackspace::Cloud::Server"
+        properties:
+          flavor: 2 GB Performance
+          image: Ubuntu 12.04 LTS (Precise Pangolin)
+          key_name: shep
+          user_data:
+              str_replace:
+                template: |
+                  #!/bin/bash
+                  apt-get install -y curl
+
+                  # Install chef-client
+                  curl -skS -L http://www.opscode.com/chef/install.sh | bash
+
+                  mkdir -p /etc/chef
+
+                  # Build chef-client config
+                  cat << 'EOF' |sudo tee /etc/chef/client.rb
+                  Ohai::Config[:disabled_plugins] = ["passwd"]
+
+                  chef_server_url "https://%chef_server_ip%:443"
+                  chef_environment "%chef_environment%"
+                  EOF
+
+                  # Grab the chef-validator.pem
+                  sudo curl http://%chef_server_ip%:9999/chef-validator.pem > %chef_pem%
+
+                  # Do initial chef-client run
+                  sudo chef-client
+
+                  # Drop a knife config file
+                  cat << 'EOH' |sudo tee /etc/chef/knife.rb
+                  chef_server_url "https://%chef_server_ip%:443"
+                  chef_environment "%chef_environment%"
+                  EOH
+                  echo "$(hostname)" >> /etc/chef/knife.rb
+                params:
+                  "%chef_server_ip%": { get_attr: [ chef_server, privateIPv4 ] }
+                  "%chef_environment%": "ref-arch"
+                  "%chef_pem%": "/etc/chef/validation.pem"
+  load_balancer_keystone_admin_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-keystone_admin_api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: 35357
+        condition: ENABLED
+      port: 35357
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_keystone_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-keystone_api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: 5000
+        condition: ENABLED
+      port: 5000
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_nova_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-nova-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: { get_param: nova_api_port }
+        condition: ENABLED
+      port: { get_param: nova_api_port }
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_nova_ec2_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-nova-ec2-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: { get_param: nova_api_ec2_port }
+        condition: ENABLED
+      port: { get_param: nova_api_ec2_port }
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_glance_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-glance-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: { get_param: glance_api_port }
+        condition: ENABLED
+      port: { get_param: glance_api_port }
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_glance_registry:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-glance-registry"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: { get_param: glance_registry_port }
+        condition: ENABLED
+      port: { get_param: glance_registry_port }
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_cinder_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-cinder-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: { get_param: cinder_api_port }
+        condition: ENABLED
+      port: { get_param: cinder_api_port }
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_ceilometer_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-ceilometer-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: 8777
+        condition: ENABLED
+      port: 8777
+      protocol: HTTP
+      algorithm: LEAST_CONNECTIONS
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_heat_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-heat-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: 8004
+        condition: ENABLED
+      port: 8004
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_heat_cfn_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-heat-cfn-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: 8000
+        condition: ENABLED
+      port: 8000
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_heat_cloudwatch_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-heat-cloudwatch-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: 8003
+        condition: ENABLED
+      port: 8003
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+  load_balancer_neutron_api:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-neutron-api"
+      nodes:
+      - addresses: { get_attr: [infra_nodes, privateIPv4] }
+        port: 9696
+        condition: ENABLED
+      port: 9696
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+        
+outputs:
+  lb-keystone_admin_api_ip:
+    value: { get_attr: [load_balancer_keystone_admin_api, PublicIp] }
+  lb-keystone_admin_ip:
+    value: { get_attr: [load_balancer_keystone_api, PublicIp] }
+  lb-nova_api:
+    value: { get_attr: [load_balancer_nova_api, PublicIp] }
+  lb-nova_ec2_api:
+    value: { get_attr: [load_balancer_nova_ec2_api, PublicIp] }
+  lb-glance_api:
+    value: { get_attr: [load_balancer_glance_api, PublicIp] }
+  lb-glance_registry:
+    value: { get_attr: [load_balancer_glance_registry, PublicIp] }
+  lb-cinder_api:
+    value: { get_attr: [load_balancer_cinder_api, PublicIp] }
+  lb-ceilometer_api:
+    value: { get_attr: [load_balancer_ceilometer_api, PublicIp] }
+  lb-heat_api:
+    value: { get_attr: [load_balancer_heat_api, PublicIp] }
+  lb-heat_cfn_api:
+    value: { get_attr: [load_balancer_heat_cfn_api, PublicIp] }
+  lb-heat_cloudwatch_api:
+    value: { get_attr: [load_balancer_heat_cloudwatch_api, PublicIp] }
+  lb-neutron_api:
+    value: { get_attr: [load_balancer_neutron_api, PublicIp] }
