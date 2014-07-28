@@ -1,0 +1,87 @@
+heat_template_version: 2013-05-23
+
+description: >
+  This template will provision the minimum number of required nodes, as well
+  it will setup all of the required lbaas vips.
+
+parameters:
+
+resources:
+  chef_server:
+    type: "OS::Nova::Server"
+    properties:
+      flavor: <flavor name>
+      image: <image name>
+      key_name: <key name>
+      user_data: |
+        #!/bin/bash
+        apt-get install -y curl screen git libxml2-dev libxslt-dev build-essential ruby1.9.3
+
+        # Install chef-server
+        curl -skS -L https://raw.githubusercontent.com/rcbops/support-tools/master/chef-install/install-chef-server.sh | bash
+
+        # THIS IS DIRTY
+        # Start a webserver in /root/.chef
+        pushd /root/.chef
+        screen -t 'webserver' -d -m python -m SimpleHTTPServer 9999
+        popd
+
+        # Grab a copy of the cookbooks
+        pushd /opt
+        git clone https://github.com/stackforge/openstack-chef-repo
+        pushd openstack-chef-repo
+        gem1.9.3 install bundler
+        bundle install --path=.bundle
+        mkdir /root/.berkshelf
+        cat << 'EOF' |sudo tee /root/.berkshelf/config.json
+        { "ssl": { "verify": false } }
+        EOF
+        bundle exec berks upload
+        knife role from file roles/*.json
+        popd
+        popd
+  infra_nodes:
+    type: "OS::Heat::ResourceGroup"
+    properties:
+      count: 3
+      resource_def:
+        type: "OS::Nova::Server"
+        properties:
+          flavor: <flavor name>
+          image: <image name>
+          key_name: <key name>
+          user_data:
+              str_replace:
+                template: |
+                  #!/bin/bash
+                  apt-get install -y curl
+
+                  # Install chef-client
+                  curl -skS -L http://www.opscode.com/chef/install.sh | bash
+
+                  mkdir -p /etc/chef
+
+                  # Build chef-client config
+                  cat << 'EOF' |sudo tee /etc/chef/client.rb
+                  Ohai::Config[:disabled_plugins] = ["passwd"]
+
+                  chef_server_url "https://%chef_server_ip%:443"
+                  chef_environment "%chef_environment%"
+                  EOF
+
+                  # Grab the chef-validator.pem
+                  sudo curl http://%chef_server_ip%:9999/chef-validator.pem > %chef_pem%
+
+                  # Do initial chef-client run
+                  sudo chef-client
+
+                  # Drop a knife config file
+                  cat << 'EOH' |sudo tee /etc/chef/knife.rb
+                  chef_server_url "https://%chef_server_ip%:443"
+                  chef_environment "%chef_environment%"
+                  EOH
+                  echo "$(hostname)" >> /etc/chef/knife.rb
+                params:
+                  "%chef_server_ip%": { get_attr: [ chef_server, privateIPv4 ] }
+                  "%chef_environment%": "ref-arch"
+                  "%chef_pem%": "/etc/chef/validation.pem"
