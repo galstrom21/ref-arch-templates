@@ -443,9 +443,9 @@ resources:
       name: "lb-heat-cfn-api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: { get_param: heat_api_cfn_port }
+        port: { get_param: heat_cfn_api_port }
         condition: ENABLED
-      port: { get_param: heat_api_cfn_port }
+      port: { get_param: heat_cfn_api_port }
       protocol: HTTP
       algorithm: { get_param: lb_algorithm }
       virtualIps:
@@ -465,9 +465,9 @@ resources:
       name: "lb-heat-cloudwatch-api"
       nodes:
       - addresses: { get_attr: [infra_nodes, privateIPv4] }
-        port: { get_param: heat_api_cloudwatch_port }
+        port: { get_param: heat_cloudwatch_api_port }
         condition: ENABLED
-      port: { get_param: heat_api_cloudwatch_port }
+      port: { get_param: heat_cloudwatch_api_port }
       protocol: HTTP
       algorithm: { get_param: lb_algorithm }
       virtualIps:
