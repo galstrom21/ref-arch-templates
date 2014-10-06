@@ -11,6 +11,10 @@ parameters:
     default: "test.com"
     constraints:
       - allowed_pattern: "[a-zA-z]*.[a-zA-Z]*"
+  keystone_sha:
+    description: sha from which to clone keystone.
+    type: string
+    default: "7c2bee76936461043671adc6d100f20775c4212f"
 
 resources:
   ldap_admin_pass:
@@ -248,7 +252,7 @@ resources:
               --adminurl http://$MYIP:35357/v2.0 \
               --internalurl http://$MYIP:5000/v2.0
           params:
-           "%keystone_sha%": "7c2bee76936461043671adc6d100f20775c4212f"
+           "%keystone_sha%": { get_param: keystone_sha }
            "%maria_admin_passwd%": { get_attr: [maria_admin_pass, value ]}
            "%ldap_admin_pass%": { get_attr: [ldap_admin_pass, value] }
            "%ldap_url%": { get_attr: [ldap, privateIPv4] }
