@@ -238,6 +238,15 @@ resources:
             sleep 10s
             keystone --os-endpoint http://0.0.0.0:35357/v2.0 --os-token ADMIN bootstrap --user-name admin --pass secrete --tenant-name admin
             popd
+
+            # Configure keystone endpoint
+            MYIP=$(ifconfig $(route -n | grep '^0.0.0.0' | awk '{print $8}') | { IFS=' :';read r; read r r a r; echo $a; } )
+            OPTS="--os-endpoint http://0.0.0.0:35357/v2.0 --os-token ADMIN"
+            keystone $OPTS service-create --name keystone --type identity
+            keystone $OPTS endpoint-create --region RegionOne --service keystone \
+              --publicurl http://$MYIP:5000/v2.0 \
+              --adminurl http://$MYIP:35357/v2.0 \
+              --internalurl http://$MYIP:5000/v2.0
           params:
            "%keystone_sha%": "7c2bee76936461043671adc6d100f20775c4212f"
            "%maria_admin_passwd%": { get_attr: [maria_admin_pass, value ]}
