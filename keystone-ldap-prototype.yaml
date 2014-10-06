@@ -1,0 +1,121 @@
+heat_template_version: 2013-05-23
+
+description: >
+  This template will provision two keystone servers and two ldap servers.
+  This will demonstrate how to configure multi-region keystone.
+
+parameters:
+  ldap_domain:
+    description: blah
+    type: string
+    default: "test.com"
+    constraints:
+      - allowed_pattern: "[a-zA-z]*.[a-zA-Z]*"
+
+resources:
+  ldap_admin_pass:
+    type: "OS::Heat::RandomString"
+  ldap-east:
+    type: "Rackspace::Cloud::Server"
+    properties:
+      flavor: 1 GB Performance
+      image: Ubuntu 14.04 LTS (Trusty Tahr)
+      key_name: shep
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            apt-get install -y debconf-utils
+            debconf-set-selections <<< 'slapd slapd/password1 password %ldap_admin_pass%'
+            debconf-set-selections <<< 'slapd slapd/password2 password %ldap_admin_pass%'
+            debconf-set-selections <<< 'slapd slapd/domain string %ldap_domain%'
+            #debconf-set-selections <<< 'slapd shared/organization string example'
+            debconf-set-selections <<< 'slapd slapd/backend select HDB'
+            debconf-set-selections <<< 'slapd slapd/purge_database boolean false'
+            debconf-set-selections <<< 'slapd slapd/move_old_database boolean true'
+            debconf-set-selections <<< 'slapd slapd/allow_ldap_v2 boolean false'
+
+            # Install openldap
+            apt-get install -y slapd ldap-utils
+
+            # Create tmp dir for ldif files
+            tmp_ldap_dir=$(mktemp -d -t ldap.$$.XXXXXXXXXX)
+
+            # Create slappasswd
+            export SLAPPASS=$(slappasswd -s %ldap_admin_pass%)
+
+            # Build out LDAP_BASE_DN from ldap_domain
+            export LDAP_BASE_DN=$(echo %ldap_domain% | awk -F '.' '{print "dc=" $1 ",dc=" $2}')
+            export LDAP_BASE_DC=$(echo %ldap_domain% | awk -F '.' '{print $1}')
+            export LDAP_MANAGER_DN="cn=Manager,${LDAP_BASE_DN}"
+
+            # drop a manager.ldif
+            tee ${tmp_ldap_dir}/manager.ldif <<EOF
+            dn: olcDatabase={1}hdb,cn=config
+            changetype: modify
+            replace: olcSuffix
+            olcSuffix: $LDAP_BASE_DN
+            -
+            replace: olcRootDN
+            olcRootDN: ${LDAP_MANAGER_DN}
+            -
+            replace: olcRootPW
+            olcRootPW: ${SLAPPASS}
+            -
+            replace: olcDbIndex
+            olcDbIndex: objectClass eq
+            olcDbIndex: default pres,eq
+            olcDbIndex: cn,sn,givenName
+            EOF
+
+            # upload manager.ldif
+            ldapmodify -Y EXTERNAL -H ldapi:/// -f ${tmp_ldap_dir}/manager.ldif
+
+            # drop a keystone.ldif
+            tee ${tmp_ldap_dir}/keystone.ldif <<EOF
+            dn: ${LDAP_BASE_DN}
+            objectClass: dcObject
+            objectClass: organizationalUnit
+            dc: ${LDAP_BASE_DC}
+            ou: ${LDAP_BASE_DC}
+
+            dn: ou=UserGroups,${LDAP_BASE_DN}
+            objectClass: organizationalUnit
+            ou: UserGroups
+
+            dn: ou=Users,${LDAP_BASE_DN}
+            objectClass: organizationalUnit
+            ou: Users
+
+            dn: ou=Roles,${LDAP_BASE_DN}
+            objectClass: organizationalUnit
+            ou: Roles
+
+            dn: ou=Projects,${LDAP_BASE_DN}
+            objectClass: organizationalUnit
+            ou: Projects
+
+            dn: cn=9fe2ff9ee4384b1894a90878d3e92bab,ou=Roles,${LDAP_BASE_DN}
+            objectClass: organizationalRole
+            ou: _member_
+            cn: 9fe2ff9ee4384b1894a90878d3e92bab
+            EOF
+
+            # upload keystone.ldif
+            ldapadd -x -w %ldap_admin_pass% -D $LDAP_MANAGER_DN -H ldap://localhost -c -f ${tmp_ldap_dir}/keystone.ldif
+          params:
+            "%ldap_admin_pass%": { get_attr: [ldap_admin_pass, value] }
+            "%ldap_domain%": { get_param: ldap_domain }
+  keystone-east:
+    type: "Rackspace::Cloud::Server"
+    properties:
+      flavor: 1 GB Performance
+      image: Ubuntu 14.04 LTS (Trusty Tahr)
+      key_name: shep
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            apt-get install -y git
+          params:
+           "%foo%": "bar"
