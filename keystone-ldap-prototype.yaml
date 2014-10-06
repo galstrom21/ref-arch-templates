@@ -31,7 +31,6 @@ resources:
             debconf-set-selections <<< 'slapd slapd/password1 password %ldap_admin_pass%'
             debconf-set-selections <<< 'slapd slapd/password2 password %ldap_admin_pass%'
             debconf-set-selections <<< 'slapd slapd/domain string %ldap_domain%'
-            #debconf-set-selections <<< 'slapd shared/organization string example'
             debconf-set-selections <<< 'slapd slapd/backend select HDB'
             debconf-set-selections <<< 'slapd slapd/purge_database boolean false'
             debconf-set-selections <<< 'slapd slapd/move_old_database boolean true'
@@ -141,8 +140,8 @@ resources:
             debconf-set-selections <<< 'mariadb-server-5.5 mysql-server/root_password_again password %maria_admin_passwd%'
             debconf-set-selections <<< 'mariadb-server-5.5 mariadb-server/oneway_migration boolean true'
             apt-get install -y mariadb-server-5.5 libmysqlclient-dev
-            mysql -u root -pr00tadm1n -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystonepass'"
-            mysql -u root -pr00tadm1n -e "create database keystone"
+            mysql -u root -p%maria_admin_passwd% -e "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystonepass'"
+            mysql -u root -p%maria_admin_passwd% -e "create database keystone"
 
             # Checkout keystone
             cd /opt
@@ -210,7 +209,7 @@ resources:
             [ldap]
             url=ldap://%ldap_url%
             user=cn=Manager,dc=test,dc=com
-            password=NLXrfmIwHocxzruessqifUkftYtoELRR
+            password=%ldap_admin_pass%
             suffix=dc=test,dc=com
             use_dumb_member=true
             user_tree_dn=ou=Users,dc=test,dc=com
@@ -226,16 +225,26 @@ resources:
 
             [policy]
             driver=keystone.policy.backends.sql.Policy
+
+            [token]
+            provider=keystone.token.providers.uuid.Provider
             EOF
             popd
 
             # sync the keystone database
             bin/keystone-manage db_sync
             screen -d -m bin/keystone-all
+            # sleep for 1/3 of a shep
+            sleep 10s
             keystone --os-endpoint http://0.0.0.0:35357/v2.0 --os-token ADMIN bootstrap --user-name admin --pass secrete --tenant-name admin
             popd
           params:
-           "%foo%": "bar"
            "%keystone_sha%": "7c2bee76936461043671adc6d100f20775c4212f"
            "%maria_admin_passwd%": { get_attr: [maria_admin_pass, value ]}
+           "%ldap_admin_pass%": { get_attr: [ldap_admin_pass, value] }
            "%ldap_url%": { get_attr: [ldap, privateIPv4] }
+outputs:
+  ldap_admin_pass:
+    value: { get_attr: [ldap_admin_pass, value] }
+  maria_admin_pass:
+    value: { get_attr: [maria_admin_pass, value ] }
