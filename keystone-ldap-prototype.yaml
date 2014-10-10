@@ -100,7 +100,8 @@ resources:
             #dc: ${LDAP_BASE_DC}
             #ou: ${LDAP_BASE_DC}
 
-            dn: ou=UserGroups,${LDAP_BASE_DN}
+            # NOTE(galstrom): Do not confuse with 'groups' in keystone
+            dn: ou=Groups,${LDAP_BASE_DN}
             objectClass: organizationalUnit
             ou: UserGroups
 
@@ -120,6 +121,196 @@ resources:
             objectClass: organizationalRole
             ou: _member_
             cn: 9fe2ff9ee4384b1894a90878d3e92bab
+
+            # BEGIN EXAMPLE USERS HERE #
+            dn: uid=admin,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Admin
+            uid: admin
+            sn: User
+            userPassword: secrete
+
+            dn: uid=jsmith,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: James Smith
+            uid: jsmith
+            sn: Smith
+            userPassword: password
+
+            dn: uid=rjohnson,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Robert Johnson
+            uid: rjohnson
+            sn: Johnson
+            userPassword: password
+
+            dn: uid=jwilliams,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: John Williams
+            uid: jwilliams
+            sn: Williams
+            userPassword: password
+
+            dn: uid=mbrown,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Michael Brown
+            uid: mbrown
+            sn: Brown
+            userPassword: password
+
+            dn: uid=wjones,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: William Jones
+            uid: wjones
+            sn: Jones
+            userPassword: password
+
+            dn: uid=dmiller,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: David Miller
+            uid: dmiller
+            sn: Miller
+            userPassword: password
+
+            dn: uid=rdavis,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Richard Davis
+            uid: rdavis
+            sn: Davis
+            userPassword: password
+
+            dn: uid=cwilson,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Charles Wilson
+            uid: cwilson
+            sn: Wilson
+            userPassword: password
+
+            dn: uid=jmartinez,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Joseph Martinez
+            uid: jmartinez
+            sn: Martinez
+            userPassword: password
+
+            dn: uid=tanderson,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Thomas Anderson
+            uid: tanderson
+            sn: Anderson
+            userPassword: password
+
+            dn: uid=ctaylor,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Christopher Taylor
+            uid: ctaylor
+            sn: Taylor
+            userPassword: password
+
+            dn: uid=dthomas,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Daniel Thomas
+            uid: dthomas
+            sn: Thomas
+            userPassword: password
+
+            dn: uid=phernandez,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Paul Hernandez
+            uid: phernandez
+            sn: Hernandez
+            userPassword: password
+
+            dn: uid=mmoore,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Mark Moore
+            uid: mmoore
+            sn: Moore
+            userPassword: password
+
+            dn: uid=dmartin,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Donald Martin
+            uid: dmartin
+            sn: Martin
+            userPassword: password
+
+            dn: uid=gjackson,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: George Jackson
+            uid: gjackson
+            sn: Jackson
+            userPassword: password
+
+            dn: uid=kthompson,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Kenneth Thompson
+            uid: kthompson
+            sn: Thompson
+            userPassword: password
+
+            dn: uid=swhite,ou=Users,${LDAP_BASE_DN}
+            objectClass: person
+            objectClass: inetOrgPerson
+            cn: Steven White
+            uid: swhite
+            sn: White
+            userPassword: password
+            # END EXAMPLE USERS HERE #
+
+            # BEGIN EXAMPLE GROUPS HERE #
+            dn: cn=engineering,ou=Groups,${LDAP_BASE_DN}
+            cn: Engineering Group
+            objectClass: groupOfNames
+            member: uid=jsmith,ou=Users,${LDAP_BASE_DN}
+            member: uid=rjohnson,ou=Users,${LDAP_BASE_DN}
+            member: uid=jwilliams,ou=Users,${LDAP_BASE_DN}
+            member: uid=mbrown,ou=Users,${LDAP_BASE_DN}
+            member: uid=wjones,ou=Users,${LDAP_BASE_DN}
+
+            dn: cn=developmet,ou=Groups,${LDAP_BASE_DN}
+            cn: Development Group
+            objectClass: groupOfNames
+            member: uid=dmiller,ou=Users,${LDAP_BASE_DN}
+            member: uid=rdavis,ou=Users,${LDAP_BASE_DN}
+            member: uid=cwilson,ou=Users,${LDAP_BASE_DN}
+            member: uid=jmartinez,ou=Users,${LDAP_BASE_DN}
+            member: uid=tanderson,ou=Users,${LDAP_BASE_DN}
+
+            dn: cn=sales,ou=Groups,${LDAP_BASE_DN}
+            cn: Salses Group
+            objectClass: groupOfNames
+            member: uid=ctaylor,ou=Users,${LDAP_BASE_DN}
+            member: uid=dthomas,ou=Users,${LDAP_BASE_DN}
+            member: uid=phernandez,ou=Users,${LDAP_BASE_DN}
+            member: uid=mmoore,ou=Users,${LDAP_BASE_DN}
+            member: uid=dmartin,ou=Users,${LDAP_BASE_DN}
+
+            dn: cn=marketing,ou=Groups,${LDAP_BASE_DN}
+            cn: Marketing Group
+            objectClass: groupOfNames
+            member: uid=gjackson,ou=Users,${LDAP_BASE_DN}
+            member: uid=kthompson,ou=Users,${LDAP_BASE_DN}
+            member: uid=swhite,ou=Users,${LDAP_BASE_DN}
+            # END EXAMPLE GROUPS HERE #
             EOF
 
             # upload keystone.ldif
@@ -169,7 +360,7 @@ resources:
             member_role_name=_member_
 
             [assignment]
-            #driver=<None>
+            driver=keystone.assignment.backends.sql.Assignment
 
             [auth]
             #
@@ -211,18 +402,40 @@ resources:
             driver=keystone.identity.backends.ldap.Identity
 
             [ldap]
+            debug_level=4095
             url=ldap://%ldap_url%
             user=cn=Manager,dc=test,dc=com
             password=%ldap_admin_pass%
             suffix=dc=test,dc=com
-            use_dumb_member=true
+            #use_dumb_member=true
+            use_dumb_member=False
+
+            # User attributes
             user_tree_dn=ou=Users,dc=test,dc=com
-            user_domain_id_attribute="businessCategory"
-            user_attribute_ignore=enabled,email,tenants,default_project_id
-            tenant_tree_dn=ou=Projects,dc=test,dc=com
-            tenant_desc_attribute=description
-            tenant_domain_id_attribute=businessCategory
-            tenant_attribute_ignore=enabled
+            user_objectClass=inetOrgPerson
+            user_id_attribute=uid
+            user_name_attribute=uid
+            user_pass_attribute=userPassword
+            #user_attribute_ignore=enabled,email,tenants,default_project_id
+            # Make it read-only
+            user_allow_create=False
+            user_allow_update=False
+            user_allow_delete=False
+
+            # tenant attributes
+            #tenant_tree_dn=ou=Projects,dc=test,dc=com
+            #tenant_desc_attribute=description
+            #tenant_attribute_ignore=enabled
+            # Make it read-only
+            tenant_allow_create=False
+            tenant_allow_update=False
+            tenant_allow_delete=False
+
+            # role attributes
+            # Make it read-only
+            role_allow_create=False
+            role_allow_update=False
+            role_allow_delete=False
 
             [oauth1]
             #driver=keystone.contrib.oauth1.backends.sql.OAuth1
@@ -240,8 +453,13 @@ resources:
             screen -d -m bin/keystone-all
             # sleep for 1/3 of a shep
             sleep 10s
-            keystone --os-endpoint http://0.0.0.0:35357/v2.0 --os-token ADMIN bootstrap --user-name admin --pass secrete --tenant-name admin
             popd
+
+            # Bootstrap the admin user
+            OPTS="--os-endpoint http://0.0.0.0:35357/v2.0 --os-token ADMIN"
+            keystone $OPTS tenant-create --name admin
+            keystone $OPTS role-create --name admin
+            keystone $OPTS user-role-add --user admin --tenant admin --role admin
 
             # Configure keystone endpoint
             MYIP=$(ifconfig $(route -n | grep '^0.0.0.0' | awk '{print $8}') | { IFS=' :';read r; read r r a r; echo $a; } )
