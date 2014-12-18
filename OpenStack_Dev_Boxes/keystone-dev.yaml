@@ -1,0 +1,34 @@
+heat_template_version: 2013-05-23
+
+description: >
+  This template will provision two keystone servers and two ldap servers.
+  This will demonstrate how to configure multi-region keystone.
+
+parameters:
+  repo_branch:
+    description: Which branch to checkout
+    type: string
+    default: "master"
+
+resources:
+  server:
+    type: "Rackspace::Cloud::Server"
+    properties:
+      flavor: 4 GB Performance
+      image: Ubuntu 14.04 LTS (Trusty Tahr)
+      key_name: shep
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+                  apt-get install -y python-virtualenv python2.7-dev screen git libsqlite3-dev libldap2-dev libsasl2-dev libxml2-dev libxslt1-dev zlib1g-dev libffi-dev libssl-dev gettext
+            pip install tox
+            pushd /opt
+            git clone https://github.com/openstack/keystone
+            pushd keystone
+            checkout %repo_branch%
+            screen -d -m tox
+            popd
+            popd
+          params:
+            "%repo_branch%": { get_param: repo_branch }
