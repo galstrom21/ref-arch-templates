@@ -11,7 +11,7 @@ parameters:
     default: "master"
 
 resources:
-  nova-dev-box:
+  server:
     type: "Rackspace::Cloud::Server"
     properties:
       flavor: 4 GB Performance
@@ -27,7 +27,8 @@ resources:
             pushd /opt
             git clone https://github.com/openstack/nova
             pushd nova
-            screen -d -m tox -e pep8
+            checkout %repo_branch%
+            screen -d -m tox
             popd
             popd
           params:
