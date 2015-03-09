@@ -1,0 +1,98 @@
+heat_template_version: 2013-05-23
+
+description: >
+  This template will provision two keystone servers and two ldap servers.
+  This will demonstrate how to configure multi-region keystone.
+
+parameters:
+  repo_branch:
+    description: Which branch to checkout
+    type: string
+    default: "master"
+  admin_password:
+    description: What to set ADMIN_PASSWORD to for devstack.
+    type: string
+    default: "secrete"
+
+resources:
+  server:
+    type: "Rackspace::Cloud::Server"
+    properties:
+      flavor: 4 GB Performance
+      image: Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)
+      key_name: shep
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            apt-get install -y git
+            pushd /opt
+            git clone https://github.com/openstack-dev/devstack
+            pushd devstack
+            checkout %repo_branch%
+            tools/create-stack-user.sh
+            chown -R stack .
+            popd
+            popd
+
+            # build template local.conf
+            tee /tmp/local.conf <<EOF
+            [[local|localrc]]
+            ADMIN_PASSWORD=%admin_password%
+            DATABASE_PASSWORD=%admin_password%
+            RABBIT_PASSWORD=%admin_password%
+            SERVICE_PASSWORD=%admin_password%
+            SERVICE_TOKEN=999888777666
+            EOF
+
+            # Install devstack
+            export SULOG_FILE=/root/stack_cmds.log
+            su -l stack -c 'cd /opt/devstack && cat /tmp/local.conf > local.conf'
+            su -l stack -c 'cd /opt/devstack && ./stack.sh'
+
+            # Setup ENV Variables for v3 api
+            source /opt/devstack/openrc admin admin
+            export OS_IDENTITY_API_VERSION=3
+            export OS_AUTH_URL=http://localhost:5000/v3
+
+            # Create a new domain
+            openstack domain create testdomain
+
+            # Create a new project in the domain
+            openstack project create \
+            --domain testdomain testproject
+
+            # Create a new user in the domain and in the project
+            openstack user create \
+              --domain testdomain \
+              --project testproject \
+              --password password testuser
+
+            # Grant admin role to new user in project
+            openstack role add \
+              --project testproject \
+              --user testuser admin
+
+            # Drop a openrc_v3
+            tee /root/openrc_v3 <<EOF
+            export OS_REGION_NAME=RegionOne
+            export OS_IDENTITY_API_VERSION=3
+            export OS_AUTH_URL=http://localhost:5000/v3
+            # openstack cli does not support version 2 of the volume api
+            #OS_VOLUME_API_VERSION=2
+            export OS_VOLUME_API_VERSION=1
+            export OS_CACERT=/opt/stack/data/CA/int-ca/ca-chain.pem
+            export OS_NO_CACHE=1
+            export OS_USERNAME=testuser
+            export OS_PASSWORD=password
+            export OS_PROJECT_NAME=testproject
+            export OS_PROJECT_DOMAIN_NAME=testdomain
+            export OS_USER_DOMAIN_NAME=testdomain
+            EOF
+
+            # Sample commands to run
+            # openstack endpoint list
+            # openstack image list
+          params:
+            "%repo_branch%": { get_param: repo_branch }
+            "%admin_password%": { get_param: admin_password }
