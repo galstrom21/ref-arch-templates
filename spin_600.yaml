@@ -13,6 +13,15 @@ parameters:
         description: "Must be an integer between 10 and 600"
 
 resources:
+  private_net:
+    type: "OS::Neutron::Net"
+    properties:
+      name: "spin_600_test_net"
+  private_subnet:
+    type: "OS::Neutron::Subnet"
+    properties:
+      network_id: { get_resource: private_net }
+      cidr: "10.100.100.0/22"
   test_servers:
     type: "OS::Heat::ResourceGroup"
     properties:
@@ -23,6 +32,9 @@ resources:
           flavor: m1.small
           image: ubuntu-server-14.04
           key_name: shep
+          networks:
+            network: { get_resource: private_net }
+            subnet: { get_resource: private_subnet }
           user_data: |
             #!/bin/bash
             apt-get install -y curl
@@ -34,6 +46,9 @@ resources:
       flavor: m1.small
       image: ubuntu-server-14.04
       key_name: shep
+      networks:
+        network: { get_resource: private_net }
+        subnet: { get_resource: private_subnet }
       user_data: |
         #!/bin/bash
         apt-get install -y curl
