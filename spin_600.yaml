@@ -15,8 +15,6 @@ parameters:
 resources:
   private_net:
     type: "OS::Neutron::Net"
-    properties:
-      name: "spin_600_test_net"
 
   private_subnet:
     type: "OS::Neutron::Subnet"
