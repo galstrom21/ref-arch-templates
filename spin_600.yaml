@@ -37,7 +37,3 @@ resources:
       user_data: |
         #!/bin/bash
         apt-get install -y curl
-
-outputs:
-  lb-keystone_admin_api_ip:
-    value: { get_attr: [load_balancer_keystone_admin_api, PublicIp] }
