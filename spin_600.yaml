@@ -21,7 +21,7 @@ resources:
         type: "OS::Nova::Server"
         properties:
           flavor: m1.small
-          image: Ubuntu 14.04
+          image: ubuntu-server-14.04
           key_name: shep
           user_data: |
             #!/bin/bash
@@ -32,7 +32,7 @@ resources:
     depends_on: [ test_servers ]
     properties:
       flavor: m1.small
-      image: Ubuntu 14.04
+      image: ubuntu-server-14.04
       key_name: shep
       user_data: |
         #!/bin/bash
