@@ -46,9 +46,9 @@ resources:
       flavor: m1.small
       image: ubuntu-server-14.04
       key_name: shep
-      networks:
-        network: { get_resource: private_net }
-        subnet: { get_resource: private_subnet }
+      networks: 
+        - network: { get_resource: private_net }
+        - subnet: { get_resource: private_subnet }
       user_data: |
         #!/bin/bash
         apt-get install -y curl
