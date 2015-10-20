@@ -1,0 +1,44 @@
+heat_template_version: 2013-05-23
+
+description: >
+  This template will provision the minimum number of required nodes, as well
+  it will setup all of the required lbaas vips.
+
+parameters:
+  resource_count:
+    type: number
+    default: 60
+    constraints:
+      - range: { min: 10, max: 600 }
+        description: "Must be an integer between 10 and 600"
+
+resources:
+  test_servers:
+    type: "OS::Heat::ResourceGroup"
+    properties:
+      count: { get_param: resource_count }
+      resource_def:
+        type: "OS::Nova::Server"
+        properties:
+          flavor: m1.small
+          image: Ubuntu 14.04
+          key_name: shep
+          user_data:
+              str_replace:
+                template: |
+                  #!/bin/bash
+                  apt-get install -y curl
+  final_server:
+    type: "OS::Nova::Server"
+    depends_on: [ test_servers ]
+    properties:
+      flavor: m1.small
+      image: Ubuntu 14.04
+      key_name: shep
+      user_data: |
+        #!/bin/bash
+        apt-get install -y curl
+
+outputs:
+  lb-keystone_admin_api_ip:
+    value: { get_attr: [load_balancer_keystone_admin_api, PublicIp] }
