@@ -23,11 +23,10 @@ resources:
           flavor: m1.small
           image: Ubuntu 14.04
           key_name: shep
-          user_data:
-              str_replace:
-                template: |
-                  #!/bin/bash
-                  apt-get install -y curl
+          user_data: |
+            #!/bin/bash
+            apt-get install -y curl
+
   final_server:
     type: "OS::Nova::Server"
     depends_on: [ test_servers ]
