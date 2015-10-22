@@ -36,7 +36,7 @@ resources:
             - network: { get_resource: private_net }
           user_data: |
             #!/bin/bash
-            apt-get install -y curl
+            apt-get install -y wget
 
   final_server:
     type: "OS::Nova::Server"
@@ -49,4 +49,4 @@ resources:
         - network: { get_resource: private_net }
       user_data: |
         #!/bin/bash
-        apt-get install -y curl
+        apt-get install -y wget
