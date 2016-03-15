@@ -1,0 +1,202 @@
+heat_template_version: 2013-05-23
+
+description: >
+  This template will provision the minimum number of required nodes, as well
+  it will setup all of the required lbaas vips.
+
+parameters:
+  keystone_admin_api_port:
+    description: The port keystone-admin-api is listening on.
+    type: number
+    default: 35357
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  keystone_api_port:
+    description: The port keystone-api is listening on.
+    type: number
+    default: 5000
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  nova_api_metadata_port:
+    description: The port nova-api-metadata is listening on.
+    type: number
+    default: 8775
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  nova_api_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 8774
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  nova_api_ec2_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 8773
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  glance_api_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 9292
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  glance_registry_port:
+    description: The port nova-api is listening on.
+    type: number
+    default: 9191
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  cinder_api_port:
+    description: The port cinder-api is listening on.
+    type: number
+    default: 8776
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  ceilometer_api_port:
+    description: The port ceilometer-api is listening on.
+    type: number
+    default: 8777
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  heat_api_port:
+    description: The port heat-api is listening on.
+    type: number
+    default: 8004
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  heat_cfn_api_port:
+    description: The port heat-cfn-api is listening on.
+    type: number
+    default: 8000
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  heat_cloudwatch_api_port:
+    description: The port heat-cloudwatch-api is listening on.
+    type: number
+    default: 8003
+    constraints:
+    - range:
+        min: 1025
+        max: 65535
+      description: Must be an integer between 1025 and 65535.
+  lb_algorithm:
+    description: The algorithm used for the loadbalancer.
+    type: string
+    default: LEAST_CONNECTIONS
+    constraints:
+    - allowed_values:
+      - LEAST_CONNECTIONS
+      - ROUND_ROBIN
+      description: |
+        Must be a valid Rackspace Cloud Loadbalancer algorithm.
+
+resources:
+  deploy_ssh_key:
+    type: "OS::Nova::KeyPair"
+    properties:
+      save_private_key: true
+      name: deploy_key
+  deployment_server:
+    type: "OS::Nova::Server"
+    properties:
+      flavor: 1 GB General Purpose v1
+      image: Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)
+      key_name: shep
+      user_data:
+        str_replace:
+          template: | 
+            #!/bin/bash
+            apt-get install -y build-essential git python-dev
+
+            # Setup SSH keys
+            echo %ssh_priv_key% > /root/.ssh/id_rsa
+            echo %ssh_pub_key% > /root/.ssh/id_rsa.pub
+            cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+
+            # Checkout openstack-ansible
+            git clone -b v12.0.7 https://github.com/openstack/openstack-ansible.git /opt/openstack-ansible
+            pushd /opt/openstack-ansible
+            scripts/bootstrap-ansible.sh
+            popd
+          params:
+            "%ssh_priv_key%": { get_attr: [ deploy_ssh_key, private_key ] }
+            "%ssh_pub_key%": { get_attr: [ deploy_ssh_key, public_key ] }
+  nova-api-metadata:
+    type: "OS::Heat::ResourceGroup"
+    properties:
+      count: 2
+      resource_def:
+        type: "OS::Nova::Server"
+        properties:
+          flavor: 1 GB General Purpose v1
+          image: Ubuntu 14.04 LTS (Trusty Tahr) (PVHVM)
+          key_name: shep
+          user_data:
+              str_replace:
+                template: |
+                  #!/bin/bash
+
+                  # Setup SSH keys
+                  echo %ssh_pub_key% >> /root/.ssh/authorized_keys
+                params:
+                  "%ssh_pub_key%": { get_attr: [ deploy_ssh_key, public_key ] }
+  lb_nova_api_metadata:
+    type: "Rackspace::Cloud::LoadBalancer"
+    properties:
+      name: "lb-nova-api-metadata"
+      nodes:
+      - addresses: { get_attr: [nova-api-metadata, privateIPv4] }
+        port: { get_param: nova_api_metadata_port }
+        condition: ENABLED
+      port: { get_param: nova_api_metadata_port }
+      protocol: HTTP
+      algorithm: { get_param: lb_algorithm }
+      virtualIps:
+      - type: PUBLIC
+        ipVersion: IPV4
+      healthMonitor:
+        attemptsBeforeDeactivation: 3
+        delay: 10
+        timeout: 120
+        type: HTTP
+        path: "/"
+        statusRegex: "."
+        bodyRegex: "."
+        
+outputs:
+  lb-nova-api-metadata:
+    value: { get_attr: [lb_nova_api_metadata, PublicIp] }
