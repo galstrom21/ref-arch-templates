@@ -5,6 +5,9 @@ description: >
   it will setup all of the required lbaas vips.
 
 parameters:
+  release_tag:
+    type: string
+    default: "12.0.7"
   keystone_admin_api_port:
     description: The port keystone-admin-api is listening on.
     type: number
@@ -128,7 +131,7 @@ resources:
   deploy_ssh_key:
     type: "OS::Nova::KeyPair"
     properties:
-      save_private_key: true
+      save_private_key: True
       name: deploy_key
   deployment_server:
     type: "OS::Nova::Server"
@@ -140,21 +143,26 @@ resources:
         str_replace:
           template: | 
             #!/bin/bash
+            apt-get update
             apt-get install -y build-essential git python-dev
 
             # Setup SSH keys
-            echo %ssh_priv_key% > /root/.ssh/id_rsa
+            cat << 'EOH' |sudo tee /root/.ssh/id_rsa
+            %ssh_priv_key%
+            EOH
+            chmod 600 /root/.ssh/id_rsa
             echo %ssh_pub_key% > /root/.ssh/id_rsa.pub
             cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
 
             # Checkout openstack-ansible
-            git clone -b v12.0.7 https://github.com/openstack/openstack-ansible.git /opt/openstack-ansible
+            git clone -b %git_tag% https://github.com/openstack/openstack-ansible.git /opt/openstack-ansible
             pushd /opt/openstack-ansible
             scripts/bootstrap-ansible.sh
             popd
           params:
             "%ssh_priv_key%": { get_attr: [ deploy_ssh_key, private_key ] }
             "%ssh_pub_key%": { get_attr: [ deploy_ssh_key, public_key ] }
+            "%git_tag%": { get_param: release_tag }
   nova-api-metadata:
     type: "OS::Heat::ResourceGroup"
     properties:
@@ -169,6 +177,7 @@ resources:
               str_replace:
                 template: |
                   #!/bin/bash
+                  apt-get update
 
                   # Setup SSH keys
                   echo %ssh_pub_key% >> /root/.ssh/authorized_keys
@@ -200,3 +209,5 @@ resources:
 outputs:
   lb-nova-api-metadata:
     value: { get_attr: [lb_nova_api_metadata, PublicIp] }
+  deploy_ssh_priv_key:
+    value: { get_attr: [ deploy_ssh_key, private_key ] }
