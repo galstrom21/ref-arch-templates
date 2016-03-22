@@ -1,4 +1,4 @@
-heat_template_version: 2013-05-23
+heat_template_version: 2014-10-16
 
 description: >
   This template will provision the minimum number of required nodes, as well
@@ -188,7 +188,7 @@ resources:
     properties:
       name: "lb-nova-api-metadata"
       nodes:
-      - addresses: { get_attr: [nova-api-metadata, privateIPv4] }
+      - addresses: { get_attr: [ nova-api-metadata, addresses, private, 0, addr ] }
         port: { get_param: nova_api_metadata_port }
         condition: ENABLED
       port: { get_param: nova_api_metadata_port }
@@ -211,3 +211,5 @@ outputs:
     value: { get_attr: [lb_nova_api_metadata, PublicIp] }
   deploy_ssh_priv_key:
     value: { get_attr: [ deploy_ssh_key, private_key ] }
+  metadata-ips:
+    value: { get_attr: [ nova-api-metadata, addresses, private, 0, addr ] }
